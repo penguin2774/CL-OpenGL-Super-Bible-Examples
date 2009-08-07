@@ -11,7 +11,24 @@
 	   rotation-matrix44
 	   transform-vector3
 	   draw-torus
-	   cross-product))
+	   with-xyzs
+	   with-matrix-xyzs
+	   cross-product
+	   set-matrix-column44
+	   set-matrix-column33
+	   get-matrix-column44
+	   get-matrix-column33
+	   scale-vector2
+	   scale-vector3
+	   vector-length-squared
+	   vector-length
+	   normalize-vector
+	   load-vector
+	   mulf
+	   divf
+	   invert-matrix44
+	   
+	   ))
 
 (in-package :m3d)
 
@@ -166,22 +183,304 @@
 		       (gl:vertex x y z)))))))
 
 
-(defmacro with-xyzs (vectors &body body)
-  `(symbol-macrolet ,(loop for i in vectors 
-			   appending (loop for j in '(".X"
-						     ".Y"
-						     ".Z")
-					for k in '(0 1 2)
+(defmacro with-matrix44-xyzs (matrices &body body)
+  `(symbol-macrolet ,(loop for i in matrices
+			   appending (loop for j in '(".XX" ".YX" ".ZX" ".TX"
+						      ".XY" ".YY" ".ZY" ".TY"
+						      ".XZ" ".YZ" ".ZZ" ".TZ"
+						      ".XT" ".YT" ".ZT" ".TT")
+					
+					for k from 0
 					  collect `(,(intern (concatenate 'string 
 							   (symbol-name i)
 							   j))
 					     (elt ,i ,k))))
      ,@body))
+
+(defmacro with-matrix3-xyzs (matrices &body body)
+  `(symbol-macrolet ,(loop for i in matrices 
+			appending (loop for j in '(".X"
+						   ".Y"
+						   ".Z")
+				       
+				     for k from 0
+				     collect `(,(intern (concatenate 'string 
+								     (symbol-name i)
+								     j))
+						(elt ,i ,k))))
+     ,@body))
+
+(defmacro with-xyzs (vectors &body body)
+  (let ((matrix44-symbols '(".XX" ".YX" ".ZX" ".TX"
+			    ".XY" ".YY" ".ZY" ".TY"
+			    ".XZ" ".YZ" ".ZZ" ".TZ"
+			    ".XT" ".YT" ".ZT" ".TT"))
+	(matrix33-symbols '(".XX" ".YX" ".ZX" 
+			    ".XY" ".YY" ".ZY" 
+			    ".XZ" ".YZ" ".ZZ"))
+	(matrix3-symbols '(".X"
+			   ".Y"
+			   ".Z")))
+
+    (labels ((collect-matrix-macrolets (i symbols)
+	       (loop for j in symbols
+		  
+		  for k from 0
+		  collect `(,(intern (concatenate 'string 
+						  (symbol-name i)
+						  j))
+			     (elt ,i ,k)))))
+      `(symbol-macrolet
+	   ,(loop for i in vectors
+	      if (typep i 'list)
+	      appending (case (second i)
+			  (3 (collect-matrix-macrolets (first i) matrix3-symbols))
+			  (33 (collect-matrix-macrolets (first i) matrix33-symbols))
+			  (44 (collect-matrix-macrolets (first i) matrix44-symbols)))
+	       else 
+	       appending (collect-matrix-macrolets i matrix44-symbols) and
+	       appending (collect-matrix-macrolets i matrix3-symbols))
+	 ,@body))))
 	  
 
-(defun cross-product (u v &keys result)
+(defun cross-product (u v &key result)
     (let ((result (or result (make-array 3))))  
       (with-xyzs (u v result)
 	(setf result.x  (- (* u.y v.z) (* v.y u.z)))
-	(setf result.y (
+	(setf result.y (+ (* (- u.x) v.z) (* v.x u.z)))
+	(setf result.z (- (* u.x v.y) (* v.x u.y)))
+	result)))
+
+(defun get-matrix-column33 (src column)
+  (subseq src (* 3 column) (+ (* 3 column) 3)))
+
+(defun get-matrix-column44 (src column)
+  (subseq src (* 4 column) (+ (* 4 column) 4)))
+
+(defun set-matrix-column33 (dest src column)
+  (setf (subseq dest (* 3 column) (+ (* 3 column) 3)) src)
+  dest)
+
+(defun set-matrix-column44 (dest src column)
+  (setf (subseq dest (* 4 column) (+ (* 4 column) 4)) src)
+  dest)
+
+(defun scale-vector2 (v scale)
+  (declare ((vector number 2) v)
+	   (number scale)
+	   (inline))
+  (setf (elt v 0) (* (elt v 0) scale))
+  (setf (elt v 1) (* (elt v 1) scale)))
+
+(defun scale-vector3 (v scale)
+  (declare ((vector number 3) v)
+	   (number scale)
+	   (inline))
+  (setf (elt v 0) (* (elt v 0) scale))
+  (setf (elt v 1) (* (elt v 1) scale))
+  (setf (elt v 2) (* (elt v 2) scale)))
+
+
+(defun vector-length-squared (u)
+  (declare ((vector number  3) u)
+	   (inline))
+  (with-matrix3-xyzs (u)
+    (+ (* u.x u.x) (* u.y u.y) (* u.z u.z))))
+	   
+
+
+(defun vector-length (u) ;; useful function?
+  (declare ((vector number 3) u)
+	   (inline))
+  (sqrt (vector-length-squared u)))
+    
   
+
+(defun normalize-vector (u)
+  (declare ((vector number 3) u)
+	   (inline))
+  (scale-vector3 u (/ 1.0 (vector-length u))))
+
+
+(defmacro load-vector (x y &rest args)
+  `(make-array ,(+ (length args) 2)
+	       :initial-contents ',(cons x (cons y args))))
+
+(defmacro mulf (form delta)
+  `(setf ,form (* ,form ,delta)))
+
+(defmacro divf (form delta)
+  `(setf ,form (/ ,form ,delta)))
+  
+;; I realy dont know what this guy is doing, its way over my head,
+;; so in all likelyhood this function has lots of typos.
+(defun invert-matrix44 (src)
+  (macrolet ((swap-rows (a b)
+	       (let ((holder-gen (gensym "holder-")))
+	       `(let ((,holder-gen ,a))
+		  (setf ,a ,b)
+		  (setf ,b ,holder-gen))))
+	     (if-abs-greater-swap (a b)
+	       `(if (> (abs ,a) (abs ,b))
+		    (swap-rows ,a ,b))))
+    (let ((r0 (make-array 8 :initial-element 0.0))
+	  (r1 (make-array 8 :initial-element 0.0))
+	  (r2 (make-array 8 :initial-element 0.0))
+	  (r3 (make-array 8 :initial-element 0.0))
+	  (dest (load-identity44))
+	  m0 m1 m2 m3)
+      (with-xyzs ((src 44) (dest 44))
+	(setf (svref r0 0) src.xx) (setf (svref r0 1) src.xy)
+	(setf (svref r0 2) src.xz) (setf (svref r0 3) src.xt)
+	(setf (svref r0 4) 1.0)
+	
+	
+	(setf (svref r1 0) src.yx) (setf (svref r1 1) src.yy)
+	(setf (svref r1 2) src.yz) (setf (svref r1 3) src.yt)
+	(setf (svref r1 5) 1.0)
+	
+	
+	(setf (svref r2 0) src.zx) (setf (svref r2 1) src.zy)
+	(setf (svref r2 2) src.zz) (setf (svref r2 3) src.zt)
+	(setf (svref r2 6) 1.0)
+	
+
+	(setf (svref r3 0) src.tx) (setf (svref r3 1) src.ty)
+	(setf (svref r3 2) src.tz) (setf (svref r3 3) src.tt)
+	(setf (svref r3 7) 1.0)
+	
+					; Choose pivot or give up.
+	(if-abs-greater-swap (svref r3 0) (svref r2 0))
+	(if-abs-greater-swap (svref r2 0) (svref r1 0))
+	(if-abs-greater-swap (svref r1 0) (svref r0 0))
+	(if (zerop (svref r0 0)) (return-from invert-matrix44 nil))
+	
+					; eliminate first variable 
+	
+	(setf m1 (/ (svref r1 0)
+		    (svref r0 0)))
+	(setf m2 (/ (svref r2 0)
+		    (svref r0 0)))
+	(setf m3 (/ (svref r3 0)
+		    (svref r0 0)))
+	(loop for i from 0 to 3
+	   for s = (svref r0 i)
+	     do
+	     (decf (svref r1 i) (* m1 s))
+	     (decf (svref r2 i) (* m2 s))
+	     (decf (svref r3 i) (* m3 s)))
+
+	(loop for i from 4 to 7
+	     for s = (svref r0 i)
+	   do (when (not (zerop s))
+		      (decf (svref r1 i) (* m1 s))
+		      (decf (svref r2 i) (* m2 s))
+		      (decf (svref r3 i) (* m3 s))))
+					; choose pivot or give up
+	(if-abs-greater-swap (svref r3 1) (svref r2 1))
+	(if-abs-greater-swap (svref r2 1) (svref r1 1))
+	(if (zerop (svref r1 1))
+	    (return-from invert-matrix44 nil))
+	
+					; eliminate second variable
+	
+	(setf m2 (/ (svref r2 1) (svref r1 1)))
+	(setf m3 (/ (svref r3 1) (svref r1 1)))
+	(decf (svref r2 2) (* m2 (svref r1 2)))
+	(decf (svref r2 3) (* m2 (svref r1 3)))
+	(decf (svref r3 2) (* m3 (svref r1 2)))
+	(decf (svref r3 3) (* m3 (svref r1 3)))
+	
+	(loop for i from 4 to 7
+	     for s = (svref r1 i)
+	     do (when (not (zerop s))
+	       (decf (svref r2 i) (* m2 s))
+	       (decf (svref r3 i) (* m3 s))))
+	
+					; choose pivot or give up
+	(if-abs-greater-swap (svref r3 2) (svref r2 2))
+	(if (zerop (svref r2 2))
+	    (return-from invert-matrix44 nil))
+	
+					; eliminate third variable
+	(setf m3 (/ (svref r3 2) (svref r2 2)))
+	(loop for i from 3 to 7
+	     do 
+	     (decf (svref r3 i) (* m3 (svref r2 i))))
+
+					; last check
+	(if (zerop (svref r3 3))
+	    (return-from invert-matrix44 nil))
+					; now back substitute row 3
+	(loop for i from 4 to 7  
+	     with s = (/ 1.0 (svref r3 3))
+	     do  (mulf (svref r3 i) s))
+	
+					; now back substitute row 2
+	(setf m2 (svref r2 3))
+	(loop for i from 4 to 7
+	     with s = (/ 1.0 (svref r2 2))
+	     do (setf (svref r2 i) (* s (- (svref r2 i) (* (svref r3 i) m2)))))
+	
+	(setf m1 (svref r1 3))
+	(loop for i from 4 to 7
+	   do (decf (svref r1 i) (* (svref r3 i) m1)))
+	
+	(setf m0 (svref r0 3))
+	(loop for i from 4 to 7
+	   do (decf (svref r0 i) (* (svref r3 i) m0)))
+	
+	
+	(setf m1 (svref r1 2))
+	(loop for i from 4 to 7
+	     with s = (/ 1.0 (svref r1 1))
+	     do (setf (svref r1 i) (* s (- (svref r1 i ) (* (svref r2 i) m1)))))
+	
+	(setf m0 (svref r0 2))
+	(loop for i from 4 to 7
+	     do (decf (svref r0 i) (* (svref r2 i) m0)))
+
+	(setf m0 (svref r0 1))
+	(loop for i from 4 to 7
+	     with s = (/ 1.0 (svref r0 0))
+	   do (setf (svref r0 i) (* s (- (svref r0 i) (* (svref r1 i) m0)))))
+
+	
+	
+	(setf dest.xx (svref r0 4))
+	(setf dest.xy (svref r0 5))
+	(setf dest.xz (svref r0 6))
+	(setf dest.xt (svref r0 7))
+	
+	(setf dest.yx (svref r1 4))
+	(setf dest.yy (svref r1 5))
+	(setf dest.yz (svref r1 6))
+	(setf dest.yt (svref r1 7))
+
+	(setf dest.zx (svref r2 4))
+	(setf dest.zy (svref r2 5))
+	(setf dest.zz (svref r2 6))
+	(setf dest.zt (svref r2 7))
+
+	(setf dest.tx (svref r3 4))
+	(setf dest.ty (svref r3 5))
+	(setf dest.tz (svref r3 6))
+	(setf dest.tt (svref r3 7))
+	dest))))
+	
+	     
+	
+
+
+	
+
+
+	
+	
+
+
+
+    
+    
+
+
