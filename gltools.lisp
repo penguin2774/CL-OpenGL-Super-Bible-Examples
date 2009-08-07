@@ -1,7 +1,9 @@
 (defpackage :gltools
   (:use :cl)
   (:nicknames :glt)
-  (:export draw-torus))
+  (:export 
+   within-2pi
+   draw-torus))
 
 (in-package :gltools)
 
