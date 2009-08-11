@@ -1,7 +1,44 @@
+;;;
+;;; shared/gltools lisp translation.
+;;;
+;;; Copyright (c) 2009 Nathanael Cunningham
+;;; See LICENSE for full licensing details.
+;;;
+
 (defpackage :gltools
   (:use :cl)
   (:nicknames :glt)
   (:export 
+   ;; from glframe.lisp
+   x
+   y
+   z
+   frame
+   set-origin
+   set-forward
+   set-up
+   z-axis
+   y-axis
+   x-axis
+   translate-world
+   move-forward
+   move-up
+   move-right
+   translate-local
+   get-matrix
+   get-camera-orientation
+   apply-camera-transform
+   apply-actor-transform
+   rotate-local-x
+   rotate-local-y
+   rotate-local-z
+   normalize
+   rotate-world
+   rotate-local
+   local-to-world
+   world-to-local
+   transform-point
+   rotate-vector   
    within-2pi
    draw-torus))
 

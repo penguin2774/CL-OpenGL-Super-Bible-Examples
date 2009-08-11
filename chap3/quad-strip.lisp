@@ -1,3 +1,10 @@
+;;;
+;;; Chapter 3 Qaud Strip example
+;;;
+;;; Copyright (c) 2009 Nathanael Cunningham
+;;; See LICENSE for full licensing details.
+;;;
+
 (defpackage :opengl-test
   (:use :cl))
 

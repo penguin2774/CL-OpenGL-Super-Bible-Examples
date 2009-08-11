@@ -1,5 +1,13 @@
-(defpackage :m3d
+;;;
+;;; share/math3d to lisp translation
+;;;
+;;; Copyright (c) 2009 Nathanael Cunningham
+;;; See LICENSE for full licensing details.
+;;;
+
+(defpackage math3d
   (:use :cl)
+  (:nicknames :m3d)
   (:export m3d-pi
 	   deg-to-rad
 	   rad-to-deg
@@ -13,6 +21,7 @@
 	   draw-torus
 	   with-xyzs
 	   with-matrix-xyzs
+	   with-xyz-slots
 	   cross-product
 	   set-matrix-column44
 	   set-matrix-column33
@@ -242,6 +251,14 @@
 	       appending (collect-matrix-macrolets i matrix3-symbols))
 	 ,@body))))
 	  
+(defmacro with-xyz-slots (slots instance &body body)
+  `(with-slots ,(map 'list (lambda (x)
+			     (if (typep x 'sequence)
+				 (first x)
+				 x)) slots) ,instance
+     (m3d:with-xyzs ,slots
+       ,@body)))
+
 
 (defun cross-product (u v &key result)
     (let ((result (or result (make-array 3))))  

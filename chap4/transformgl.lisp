@@ -1,3 +1,10 @@
+;;;
+;;; Chapter 4 TransformGL example
+;;;
+;;; Copyright (c) 2009 Nathanael Cunningham
+;;; See LICENSE for full licensing details.
+;;;
+
 (defpackage :opengl-test
   (:use :cl))
 

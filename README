@@ -1,0 +1,14 @@
++----------------------------------------+
+| OpenGL Superbible translations to lisp.|
++----------------------------------------+
+
+
+Copyright (c) 2009 Nathanael Cunningham
+Please see LICENSE for full licensing details.
+
+This project is an attempt to translate the examples and shared
+libraries included with "The OpenGL Superbible" to lisp using
+cl-opengl package. I haven't tested all the shared libraries (as of
+this writing glframe is not working properly) but hopefully it will be
+of some use to others.
+

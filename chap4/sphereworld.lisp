@@ -1,7 +1,15 @@
+;;;
+;;; Chapter 4 SphereWorld example.
+;;;
+;;; Copyright (c) 2009 Nathanael Cunningham
+;;; See LICENSE for full licensing details.
+;;;
+
+
 (defpackage :opengl-test
   (:use :cl))
 
-(load "../m3d.lisp")
+
 
 (in-package :opengl-test)
 
@@ -29,6 +37,13 @@
    (drag-point
     :initform nil
     :accessor drag-point)
+   (spheres 
+    :initform (list)
+    :accessor spheres)
+   (camera
+    :initform (make-instance 'glt:frame)
+    :accessor camera)
+    
    (torus-rot-y
     :initform 0.0
     :accessor torus-rot-y))
@@ -69,23 +84,23 @@
 (defparameter x-rot 0.0)
 (defparameter y-rot 0.0)
 
-(defmethod glut:keyboard ((w hello-window) key x y)
-  (case key
-    (#\+ (incf (zfar w) 10)
-	 (glut:reshape w (glut:width w) (glut:height w)))
-    (#\- (decf (zfar w) 10)
-	 (glut:reshape w (glut:width w) (glut:height w)))
-    (#\1 (setf (depth w) (not (depth w))))
-    (#\2 (setf (cull w) (not (cull w))))
-    (#\3 (setf (outline w) (not (outline w)))))
-  (glut:post-redisplay))
+;; (defmethod glut:keyboard ((w hello-window) key x y)
+;;   (case key
+;;     (#\+ (incf (zfar w) 10)
+;; 	 (glut:reshape w (glut:width w) (glut:height w)))
+;;     (#\- (decf (zfar w) 10)
+;; 	 (glut:reshape w (glut:width w) (glut:height w)))
+;;     (#\1 (setf (depth w) (not (depth w))))
+;;     (#\2 (setf (cull w) (not (cull w))))
+;;     (#\3 (setf (outline w) (not (outline w)))))
+;;   (glut:post-redisplay))
     
 (defmethod glut:special ((w hello-window) key x y)
   (case key
-    (:key-left (setf (rot-y w) (+ (rot-y w) 5.0)))
-    (:key-right (setf (rot-y w) (- (rot-y w) 5.0)))
-    (:key-up (setf (rot-x w) (+ (rot-x w) 5.0)))
-    (:key-down (setf (rot-x w) (- (rot-x w) 5.0))))
+    (:key-left (glt:rotate-local-y (camera w) 0.1))
+    (:key-right (glt:rotate-local-y (camera w) -0.1))
+    (:key-up (glt:move-forward (camera w) 0.1))
+    (:key-down (glt:move-forward (camera w) -0.1)))
   
   (glut:post-redisplay))
 
@@ -105,51 +120,86 @@
 (defmethod glut:display-window :before ((w hello-window))
   (glut:enable-tick w 33)
   ;; Select clearing color.
-  (setup-RC))
+  (setup-RC w))
   ;;(gl:clear-color 0 0 0 0)
   ;; Initialize viewing values.
   ;;(glut:reshape w (glut:width w) (glut:height w)))
 
 (defvar light-pos '(0.0 0.0 0.0 1.0))
+(defvar spheres 50)
+(defgeneric setup-RC (w))
 
-(defun setup-RC ()
+(defmethod setup-RC ((w hello-window))
   (gl:enable :depth-test)
   (gl:front-face :ccw)
   (gl:enable :cull-face)
   
   (gl:clear-color 0.0 0.0 0.5 1.0)
-  (%gl:polygon-mode :front-and-back :line))
+  (%gl:polygon-mode :front-and-back :line)
+  (loop repeat  50
+       do (push (glt:set-origin (make-instance 'glt:frame) 
+			     (coerce (* (- (random 400) 200) 0.1) 'single-float)
+			     0.0
+			     (coerce (* (- (random 400) 200) 0.1) 'single-float)) (spheres w))))
+
+
+(defgeneric draw-ground (w))
+
+(defmethod draw-ground ((w hello-window))
+  (gl:with-primitive :lines
+    (loop for line from -20.0 to 20.0
+	 do
+	 (gl:vertex line -0.4 20.0)
+	 (gl:vertex line -0.4 -20.0)
+	 
+	 (gl:vertex 20.0 -0.4 line)
+	 (gl:vertex -20.0 -0.4 line))))
+	 
+    
 
 (defgeneric render-scene (w))
 
+(let ((y-rot 0.0))
+  (defmethod render-scene ((w hello-window))
 
-(defmethod render-scene ((w hello-window))
-  (incf (torus-rot-y w) 0.5)
-  (watch-var (torus-rot-y w))
-  (gl:clear :color-buffer-bit :depth-buffer-bit)
-  (gl:with-pushed-matrix 
-    (let ((m (m3d:rotation-matrix44 (m3d:load-identity44) (m3d:deg-to-rad (torus-rot-y w)) 0.0 1.0 0.0)))
-      (setf (elt m 12) 0.0)
-      (setf (elt m 13) 0.0)
-      (setf (elt m 14) -2.5)
-      (gl:load-matrix m)
-      (glt:draw-torus 0.35  0.15 40.0 20.0)))
+    (incf y-rot 0.5)
     
-    (glut:swap-buffers))
+    (gl:clear :color-buffer :depth-buffer)
+    
+    (gl:with-pushed-matrix
+      (glt:apply-camera-transform (camera w))
+      (draw-ground w)
+      
+      (loop for i in (spheres w)
+	   do (gl:with-pushed-matrix 
+		(glt:apply-actor-transform i)
+		(glut:solid-sphere 0.1 0.0 -2.5)))
+      
+      (gl:with-pushed-matrix 
+	(gl:translate 0.0 0.0 -2.5)
+	(gl:with-pushed-matrix 
+	  (gl:rotate (* (- y-rot) 2.0) 0.0 1.0 0.0)
+	  (gl:translate 1.0 0.0 0.0)
+	  (glut:solid-sphere 0.1 13.0 26.0))
+	(gl:rotate y-rot 0.0 1.0 0.0)
+	(glt:draw-torus 0.35 0.15 40.0 20.0)))
+	  
+    
+    (glut:swap-buffers)))
 
-(defmethod glut:mouse ((w hello-window) button state x y)
-  (when (eq button :left-button)
-    (if (eq state :down)
-	(setf (drag-point w) (cons x y))
-	(setf (drag-point w) nil))))
+;; (defmethod glut:mouse ((w hello-window) button state x y)
+;;   (when (eq button :left-button)
+;;     (if (eq state :down)
+;; 	(setf (drag-point w) (cons x y))
+;; 	(setf (drag-point w) nil))))
       
   
-(defmethod glut:motion ((w hello-window) x y)
-  (when (drag-point w)
-    (setf (rot-y w) (+ (- (car (drag-point w)) x) (rot-y w)))
-    (setf (rot-x w) (+ (- (cdr (drag-point w)) y) (rot-x w)))
-    (setf (drag-point w) (cons x y))
-    (glut:post-redisplay)))
+;; (defmethod glut:motion ((w hello-window) x y)
+;;   (when (drag-point w)
+;;     (setf (rot-y w) (+ (- (car (drag-point w)) x) (rot-y w)))
+;;     (setf (rot-x w) (+ (- (cdr (drag-point w)) y) (rot-x w)))
+;;     (setf (drag-point w) (cons x y))
+;;     (glut:post-redisplay)))
 		       
 
 

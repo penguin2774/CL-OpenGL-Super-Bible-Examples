@@ -1,3 +1,10 @@
+;;;
+;;; shared/glframe lisp translation.
+;;;
+;;; Copyright (c) 2009 Nathanael Cunningham
+;;; See LICENSE for full licensing details.
+;;;
+
 (in-package :gltools)
 
 
@@ -103,31 +110,24 @@
   (m3d:cross-product (up f) (forward f)))
 
 
-(defmacro with-xyz-slots (slots instance &body body)
-  `(with-slots ,(map 'list (lambda (x)
-			     (if (typep x 'sequence)
-				 (first x)
-				 x)) slots) ,instance
-     (m3d:with-xyzs ,slots
-       ,@body)))
 
 (defgeneric translate-world (frame x y z))
 (defmethod translate-world ((f frame) x y z)
-  (with-xyz-slots (origin) f
+  (m3d:with-xyz-slots (origin) f
     (incf origin.x x)
     (incf origin.y y)
     (incf origin.z z)))
 
 (defgeneric move-forward (frame delta))
 (defmethod move-forward ((f frame) delta)
-  (with-xyz-slots (origin forward) f
+  (m3d:with-xyz-slots (origin forward) f
     (incf origin.x (* forward.x delta))
     (incf origin.y (* forward.y delta))
     (incf origin.z (* forward.z delta))))
 
 (defgeneric move-up (frame delta))
 (defmethod move-up ((f frame) delta)
-  (with-xyz-slots (origin up) f
+  (m3d:with-xyz-slots (origin up) f
     (incf origin.x (* up.x delta))
     (incf origin.y (* up.y delta))
     (incf origin.z (* up.z delta))))
@@ -136,7 +136,7 @@
 (defmethod move-right ((f frame) delta)
   (let ((cross (m3d:cross-product (slot-value f 'up) 
 				  (slot-value f 'forward))))
-    (with-xyz-slots (origin) f
+    (m3d:with-xyz-slots (origin) f
       (m3d:with-xyzs (cross)
 	(incf origin.x (* cross.x delta))
 	(incf origin.y (* cross.y delta))
@@ -180,7 +180,7 @@
 
 (defmethod get-camera-orientation ((f frame))
   (with-slots (forward up) f
-    (let* ((z (map 'sequence #'- forward))
+    (let* ((z (map 'vector #'- forward))
 	  (x (m3d:cross-product up z))
 	  (result (m3d:load-identity44)))
       (m3d:set-matrix-column44 result x 0)
@@ -191,7 +191,7 @@
 
 (defgeneric apply-camera-transform (frame &optional rot-only?))
 (defmethod apply-camera-transform ((f frame) &optional rot-only?)
-  (with-xyz-slots (origin) f
+  (m3d:with-xyz-slots (origin) f
     (gl:mult-matrix (get-camera-orientation f))
     (if rot-only?
 	(gl:translate (- origin.x)
@@ -244,7 +244,7 @@
 
 (defmethod rotate-local-y ((f frame) angle)
   (declare (float angle))
-  (with-xyz-slots (up forward) f
+  (m3d:with-xyz-slots (up forward) f
     (let ((rot-mat (m3d:rotation-matrix44 (m3d:load-identity44)
 					    angle
 					    up.x up.y up.z))
@@ -267,7 +267,7 @@
 
 (defmethod rotate-local-z ((f frame) angle)
   (declare (float angle))
-  (with-xyz-slots (up forward) f
+  (m3d:with-xyz-slots (up forward) f
     (let ((rot-mat (m3d:rotation-matrix44 (m3d:load-identity44)
 					    angle
 					    forward.x forward.y forward.z))
@@ -347,7 +347,7 @@
 (defmethod local-to-world ((f frame) local)
   (let ((rot-mat (get-matrix f t))
 	(world (make-array 3)))
-    (with-xyz-slots ((origin 3)) f
+    (m3d:with-xyz-slots ((origin 3)) f
 	(m3d:with-xyzs ((world 3) (local 3) (rot-mat 44))
 	  (setf world.x (+ (* rot-mat.xx local.x) 
 			   (* rot-mat.xy local.y)
@@ -369,7 +369,7 @@
   (let ((new-world (make-array 3))
 	(local (make-array 3))
 	(inv-mat (m3d:invert-matrix44 (get-matrix f t))))
-    (with-xyz-slots ((origin 3)) f
+    (m3d:with-xyz-slots ((origin 3)) f
       (m3d:with-xyzs ((new-world 3) (world 3) (inv-mat 44) (local 3))
 	(setf new-world.x (- world.x origin.x))
 	(setf new-world.y (- world.y origin.y))

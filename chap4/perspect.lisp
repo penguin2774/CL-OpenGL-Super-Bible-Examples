@@ -1,3 +1,12 @@
+;;;
+;;; Chapter 4 Perspective Example
+;;;
+;;; Copyright (c) 2009 Nathanael Cunningham
+;;; See LICENSE for full licensing details.
+;;;
+
+
+
 (defpackage :opengl-test
   (:use :cl))
 
