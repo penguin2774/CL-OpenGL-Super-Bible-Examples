@@ -116,21 +116,24 @@
   (m3d:with-xyz-slots (origin) f
     (incf origin.x x)
     (incf origin.y y)
-    (incf origin.z z)))
+    (incf origin.z z))
+  f)
 
 (defgeneric move-forward (frame delta))
 (defmethod move-forward ((f frame) delta)
   (m3d:with-xyz-slots (origin forward) f
     (incf origin.x (* forward.x delta))
     (incf origin.y (* forward.y delta))
-    (incf origin.z (* forward.z delta))))
+    (incf origin.z (* forward.z delta)))
+  f)
 
 (defgeneric move-up (frame delta))
 (defmethod move-up ((f frame) delta)
   (m3d:with-xyz-slots (origin up) f
     (incf origin.x (* up.x delta))
     (incf origin.y (* up.y delta))
-    (incf origin.z (* up.z delta))))
+    (incf origin.z (* up.z delta)))
+  f)
 
 (defgeneric move-right (frame delta))
 (defmethod move-right ((f frame) delta)
@@ -140,7 +143,8 @@
       (m3d:with-xyzs (cross)
 	(incf origin.x (* cross.x delta))
 	(incf origin.y (* cross.y delta))
-	(incf origin.z (* cross.z delta))))))
+	(incf origin.z (* cross.z delta)))))
+  f)
   
 
 
@@ -148,30 +152,27 @@
 (defmethod translate-local ((f frame) x y z)
   (move-forward z)
   (move-up y)
-  (move-right x))
+  (move-right x)
+  f)
 
 (defgeneric get-matrix (frame  &optional rotation-only?))
 
 (defmethod get-matrix ((f frame) &optional rotation-only?)
   (with-slots (up forward origin) f
     (let ((x-axis (m3d:cross-product up forward))
-	  (result (make-array 16 :element-type 'float
-			      :initial-element 0.0)))
+	  (result (m3d:load-identity44)))
       (m3d:set-matrix-column44 result x-axis 0)
-      (setf (elt result 3) 0.0)
+
 
       (m3d:set-matrix-column44 result up 1)
-      (setf (elt result 7) 0.0)
+
       
       (m3d:set-matrix-column44 result forward 2)
-      (setf (elt result 11) 0.0)
 
-      (if rotation-only?
-	  (progn (setf (elt result 12) 0.0)
-		 (setf (elt result 13) 0.0)
-		 (setf (elt result 14) 0.0))
+
+      (if (not rotation-only?)
 	  (m3d:set-matrix-column44 result origin 3))
-      (setf (elt result 15) 1.0)
+
       result)))
 
 
@@ -183,30 +184,42 @@
     (let* ((z (map 'vector #'- forward))
 	  (x (m3d:cross-product up z))
 	  (result (m3d:load-identity44)))
-      (m3d:set-matrix-column44 result x 0)
-      (m3d:set-matrix-column44 result up 1)
-      (m3d:set-matrix-column44 result z 2)
+      (m3d:with-xyzs ((result 44) (x 3) (up 3) (z 3))
+	(setf result.xx x.x)
+	(setf result.xy x.y)
+	(setf result.xz x.z)
+
+	(setf result.yx up.x)
+	(setf result.yy up.y)
+	(setf result.yz up.z)
+
+	(setf result.zx z.x)
+	(setf result.zy z.y)
+	(setf result.zz z.z))
       result)))
 
 
 (defgeneric apply-camera-transform (frame &optional rot-only?))
 (defmethod apply-camera-transform ((f frame) &optional rot-only?)
-  (m3d:with-xyz-slots (origin) f
+  (declare (inline))
+  (m3d:with-xyz-slots ((origin 3)) f
     (gl:mult-matrix (get-camera-orientation f))
-    (if rot-only?
+    (if (not rot-only?)
 	(gl:translate (- origin.x)
 		      (- origin.y)
-		      (- origin.z)))))
+		      (- origin.z))))
+  f)
 
 (defgeneric apply-actor-transform (frame &optional rot-only?))
 
 (defmethod apply-actor-transform ((f frame) &optional rot-only?)
-  (gl:mult-matrix (get-matrix f rot-only?)))
+  (gl:mult-matrix (get-matrix f rot-only?))
+  f)
 
 (defgeneric rotate-local-x (frame angle))
 
 (defmethod rotate-local-x ((f frame) angle)
-  (declare (float angle))
+  (declare (single-float angle))
   (with-slots (up forward) f
     (let ((rot-mat (let ((cross (m3d:cross-product up forward)))
 		     (m3d:rotation-matrix44 (m3d:load-identity44)
@@ -214,43 +227,9 @@
 					    (elt cross 0)
 					    (elt cross 1)
 					    (elt cross 2))))
-	  (new-vect (make-array 3 :element-type 'float
+	  (new-vect (make-array 3 :element-type 'single-float
 				:initial-element 0.0)))
-      (m3d:with-xyzs (new-vect up forward)
-	(setf new-vect.x (+ (* (elt rot-mat 0) forward.x)
-			    (* (elt rot-mat 4) forward.y)
-			    (* (elt rot-mat 8) forward.z)))
-	(setf new-vect.y (+ (* (elt rot-mat 1) forward.x)
-			    (* (elt rot-mat 5) forward.y)
-			    (* (elt rot-mat 9) forward.z)))
-	(setf new-vect.z (+ (* (elt rot-mat 2) forward.x)
-			    (* (elt rot-mat 6) forward.y)
-			    (* (elt rot-mat 10) forward.z)))
-	(setf forward (copy-seq new-vect))
-
-	(setf new-vect.x (+ (* (elt rot-mat 0) up.x)
-			    (* (elt rot-mat 4) up.y)
-			    (* (elt rot-mat 8) up.z)))
-	(setf new-vect.y (+ (* (elt rot-mat 1) up.x)
-			    (* (elt rot-mat 5) up.y)
-			    (* (elt rot-mat 9) up.z)))
-	(setf new-vect.z (+ (* (elt rot-mat 2) up.x)
-			    (* (elt rot-mat 6) up.y)
-			    (* (elt rot-mat 10) up.z)))
-	(setf up (copy-seq new-vect))
-	nil))))
-
-(defgeneric rotate-local-y (frame angle))
-
-(defmethod rotate-local-y ((f frame) angle)
-  (declare (float angle))
-  (m3d:with-xyz-slots (up forward) f
-    (let ((rot-mat (m3d:rotation-matrix44 (m3d:load-identity44)
-					    angle
-					    up.x up.y up.z))
-	  (new-vect (make-array 3 :element-type 'float
-				:initial-element 0.0)))
-      (m3d:with-xyzs (new-vect rot-mat)
+      (m3d:with-xyzs ((rot-mat 44) (new-vect 3) (up 3) (forward 3))
 	(setf new-vect.x (+ (* rot-mat.xx forward.x)
 			    (* rot-mat.xy forward.y)
 			    (* rot-mat.xz forward.z)))
@@ -261,19 +240,53 @@
 			    (* rot-mat.zy forward.y)
 			    (* rot-mat.zz forward.z)))
 	(setf forward (copy-seq new-vect))
-	nil))))
+
+	(setf new-vect.x (+ (* rot-mat.xx up.x)
+			    (* rot-mat.xy up.y)
+			    (* rot-mat.xz up.z)))
+	(setf new-vect.y (+ (* rot-mat.yx up.x)
+			    (* rot-mat.yy up.y)
+			    (* rot-mat.yz up.z)))
+	(setf new-vect.z (+ (* rot-mat.zx up.x)
+			    (* rot-mat.zy up.y)
+			    (* rot-mat.zz up.z)))
+	(setf up new-vect)
+	f))))
+
+(defgeneric rotate-local-y (frame angle))
+
+(defmethod rotate-local-y ((f frame) angle)
+  (declare (single-float angle))
+  (m3d:with-xyz-slots ((up 3) (forward 3)) f
+    (let ((rot-mat (m3d:rotation-matrix44 (m3d:load-identity44)
+					    angle
+					    up.x up.y up.z))
+	  (new-vect (make-array 3 :element-type 'single-float
+				:initial-element 0.0)))
+      (m3d:with-xyzs ((new-vect 3) ( rot-mat 44))
+	(setf new-vect.x (+ (* rot-mat.xx forward.x)
+			    (* rot-mat.xy forward.y)
+			    (* rot-mat.xz forward.z)))
+	(setf new-vect.y (+ (* rot-mat.yx forward.x)
+			    (* rot-mat.yy forward.y)
+			    (* rot-mat.yz forward.z)))
+	(setf new-vect.z (+ (* rot-mat.zx forward.x)
+			    (* rot-mat.zy forward.y)
+			    (* rot-mat.zz forward.z)))
+	(setf forward new-vect)
+	f))))
 
 (defgeneric rotate-local-z (frame angle))
 
 (defmethod rotate-local-z ((f frame) angle)
   (declare (float angle))
-  (m3d:with-xyz-slots (up forward) f
+  (m3d:with-xyz-slots ((up 3) ( forward 3)) f
     (let ((rot-mat (m3d:rotation-matrix44 (m3d:load-identity44)
 					    angle
 					    forward.x forward.y forward.z))
-	  (new-vect (make-array 3 :element-type 'float
+	  (new-vect (make-array 3 :element-type 'single-float
 				:initial-element 0.0)))
-      (m3d:with-xyzs (new-vect rot-mat)
+      (m3d:with-xyzs ((new-vect 3) (rot-mat 44))
 	(setf new-vect.x (+ (* rot-mat.xx up.x)
 			    (* rot-mat.xy up.y)
 			    (* rot-mat.xz up.z)))
@@ -284,8 +297,8 @@
 			    (* rot-mat.zy up.y)
 			    (* rot-mat.zz up.z)))
 	
-	(setf up (copy-seq new-vect))
-	nil))))
+	(setf up new-vect)
+	f))))
 
 
 
@@ -297,7 +310,7 @@
       (m3d:cross-product cross up :result forward)
       (m3d:normalize-vector up)
       (m3d:normalize-vector forward)
-      nil)))
+      f)))
 
 
 (defgeneric rotate-world (frame angle x y z))
@@ -330,7 +343,7 @@
 			    (* rot-mat.zy forward.y)
 			    (* rot-mat.zz forward.z)))
 	(setf forward (copy-seq new-vect))
-	nil))))
+	f))))
 
 
 (defgeneric rotate-local (frame angle x y z))

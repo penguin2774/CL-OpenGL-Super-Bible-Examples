@@ -10,6 +10,9 @@
   (:nicknames :glt)
   (:export 
    ;; from glframe.lisp
+   forward
+   up
+   origin
    x
    y
    z

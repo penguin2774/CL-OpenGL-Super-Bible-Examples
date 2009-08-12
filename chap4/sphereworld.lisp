@@ -38,19 +38,21 @@
     :initform nil
     :accessor drag-point)
    (spheres 
-    :initform (list)
+    :initform nil
     :accessor spheres)
    (camera
     :initform (make-instance 'glt:frame)
-    :accessor camera)
-    
+    :accessor camera)   
    (torus-rot-y
     :initform 0.0
     :accessor torus-rot-y))
   (:default-initargs :pos-x 100 :pos-y 100 :width 800 :height 600
                      :mode '(:double :rgb  :depth) :title "So nice a window, I though you might enjoy it!"))
 
-
+(defclass sphere (glt:frame)
+  ((size
+    :initform 0.1
+    :accessor size)))
 
 
 (defconstant +n-range+ 100.0)
@@ -113,7 +115,7 @@
     (gl:viewport 0 0 w h)
     (gl:matrix-mode :projection)
     (gl:load-identity)
-    (glu:perspective 80.0 ratio 1.0 400.0)
+    (glu:perspective 35.0 ratio 1.0 50.0)
     (gl:matrix-mode :modelview)
     (gl:load-identity)))
 
@@ -130,17 +132,19 @@
 (defgeneric setup-RC (w))
 
 (defmethod setup-RC ((w hello-window))
-  (gl:enable :depth-test)
-  (gl:front-face :ccw)
-  (gl:enable :cull-face)
+  ;(gl:enable :depth-test)
+  ;(gl:front-face :ccw)
+  ;(gl:enable :cull-face)
   
   (gl:clear-color 0.0 0.0 0.5 1.0)
   (%gl:polygon-mode :front-and-back :line)
-  (loop repeat  50
-       do (push (glt:set-origin (make-instance 'glt:frame) 
-			     (coerce (* (- (random 400) 200) 0.1) 'single-float)
-			     0.0
-			     (coerce (* (- (random 400) 200) 0.1) 'single-float)) (spheres w))))
+  (setf (spheres w) (loop repeat  50
+	collect (let ((result  (make-instance 'sphere)))
+		  (setf (size result) (* (1+ (random 19)) 0.1))
+		  (glt:set-origin result
+		   (coerce (* (- (random 400) 200) 0.1) 'single-float)
+		   (coerce (* (random 100) 0.01) 'single-float)
+		   (coerce (* (- (random 400) 200) 0.1) 'single-float))))))
 
 
 (defgeneric draw-ground (w))
@@ -163,7 +167,9 @@
   (defmethod render-scene ((w hello-window))
 
     (incf y-rot 0.5)
-    
+    (watch-var (glt:origin (camera w))
+	       (glt:forward (camera w))
+	       (glt:up (camera w)))
     (gl:clear :color-buffer :depth-buffer)
     
     (gl:with-pushed-matrix
@@ -171,9 +177,9 @@
       (draw-ground w)
       
       (loop for i in (spheres w)
-	   do (gl:with-pushed-matrix 
+	   	   do (gl:with-pushed-matrix 
 		(glt:apply-actor-transform i)
-		(glut:solid-sphere 0.1 0.0 -2.5)))
+		(glut:solid-sphere (size i) 13.0 26.0)))
       
       (gl:with-pushed-matrix 
 	(gl:translate 0.0 0.0 -2.5)
