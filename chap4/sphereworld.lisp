@@ -7,7 +7,9 @@
 
 
 (defpackage :opengl-test
-  (:use :cl))
+  (:nicknames :gltest)
+  (:use :cl)
+  (:export :rb-hello))
 
 
 
