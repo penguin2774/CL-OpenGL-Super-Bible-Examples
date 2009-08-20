@@ -7,7 +7,7 @@
 
 
 (defpackage :chap5-triangle
-  (:nicknames :c5-tri)
+  (:nicknames :triangle)
   (:use :cl)
   (:export :run))
 

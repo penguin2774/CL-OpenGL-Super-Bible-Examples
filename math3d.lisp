@@ -36,7 +36,9 @@
 	   mulf
 	   divf
 	   invert-matrix44
-	   
+	   find-normal
+	   normalized-vertices
+	   normalize
 	   ))
 
 (in-package :m3d)
@@ -287,7 +289,8 @@
 	   (number scale)
 	   (inline))
   (setf (elt v 0) (* (elt v 0) scale))
-  (setf (elt v 1) (* (elt v 1) scale)))
+  (setf (elt v 1) (* (elt v 1) scale))
+  v)
 
 (defun scale-vector3 (v scale)
   (declare ((vector number 3) v)
@@ -295,7 +298,8 @@
 	   (inline))
   (setf (elt v 0) (* (elt v 0) scale))
   (setf (elt v 1) (* (elt v 1) scale))
-  (setf (elt v 2) (* (elt v 2) scale)))
+  (setf (elt v 2) (* (elt v 2) scale))
+  v)
 
 
 (defun vector-length-squared (u)
@@ -321,7 +325,7 @@
 
 (defmacro load-vector (x y &rest args)
   `(make-array ,(+ (length args) 2)
-	       :initial-contents ',(cons x (cons y args))))
+	       :initial-contents ,(cons 'list (cons x (cons y args)))))
 
 (defmacro mulf (form delta)
   `(setf ,form (* ,form ,delta)))
@@ -485,7 +489,29 @@
 	(setf dest.tt (svref r3 7))
 	dest))))
 	
-	     
+(defun find-normal (p1 p2 p3)
+  (with-xyzs ((p1 3) (p2 3) (p3 3))
+    (cross-product (load-vector (- p1.x p2.x)
+				(- p1.y p2.y)
+				(- p1.z p2.z))
+		   (load-vector (- p2.x p3.x)
+				(- p2.y p3.y)
+				(- p2.z p3.z)))))
+
+
+(defmethod normalize ((v sequence))
+  (m3d:scale-vector3 v (/ 1.0 (m3d:vector-length v))))
+
+
+(defmacro normalized-vertices (p1 p2 p3)
+  (let ((normal (normalize (find-normal p1 p2 p3))))
+    (with-xyzs ((p1 3) (p2 3) (p3 3)
+		(normal 3))
+      `(progn 
+	 (gl:normal ,normal.x ,normal.y ,normal.z)
+	 (gl:vertex ,p1.x ,p1.y ,p1.z)
+	 (gl:vertex ,p2.x ,p2.y ,p2.z)
+	 (gl:vertex ,p3.x ,p3.y ,p3.z)))))
 	
 
 
