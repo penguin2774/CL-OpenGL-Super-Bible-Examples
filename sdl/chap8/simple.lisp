@@ -37,7 +37,7 @@
    
 (defun convert-image-for-gl (surface)
   (let ((result (sdl:create-surface (sdl:width surface) (sdl:height surface)
-				    :bpp 24)))
+				    :bpp 32 :pixel-alpha t)))
     (sdl:blit-surface surface result)
     result))
   
@@ -45,14 +45,17 @@
   (cffi:foreign-slot-value (sdl::fp surface) 'sdl-cffi::SDL-Surface 'sdl-cffi::pixels))
 
 (defun load-texture (surface)
-  (let ((texture (first (gl:gen-textures 1))))
-    (gl:bind-texture :texture-2d texture)
+
+  (let ((texture (gl:gen-textures 1)))
+    (gl:bind-texture :texture-2d (first texture))
     (gl:tex-parameter :texture-2d :texture-min-filter :linear)
     (gl:tex-parameter :texture-2d :texture-mag-filter :linear)
-    (gl:tex-image-2d :texture-2d 0
-		     :rgb (sdl:width surface) (sdl:height surface)
-		     0 :rgb :unsigned-byte (sdl-base::with-pixel (pixels (sdl::fp surface))
-		       (sdl-base::pixel-data pixels)))
+    
+    (gl:tex-image-2d :texture-2d  0 
+		     :rgba  (sdl:width surface) (sdl:height surface) 0
+		      :rgba :unsigned-byte (sdl-base::with-pixel (pixels (sdl::fp surface))
+					     (sdl-base::pixel-data pixels)))
+ 
     texture))
 
 
@@ -68,6 +71,7 @@
 		  )))
   (gl:clear :color-buffer)
   (gl:color 1.0 1.0 1.0)
+  (%gl:bind-texture :texture-2d (first *ship*))
   (gl:with-pushed-matrix 
     (gl:translate 10 10 0.0)
     (gl:scale 200 200 0.0)
@@ -107,11 +111,14 @@
       (sdl:window 512 512 :flags sdl:SDL-OPENGL :title-caption "Nate's amazing moving box")
       (resize-window w 512 512)
       (setup-RC w)
-      (setf *ship* (load-texture (sdl-image:load-image "/home/nathan/prj/lab/opengl/sdl/chap8/hartnell-1.png"  )))
+      (sdl:with-surfaces  ((alien (sdl-image:load-image "/home/nathan/prj/lab/opengl/sdl/chap8/hartnell-1.png"))
+			   (calien (convert-image-for-gl alien)))
+	
+	(setf *ship* (load-texture calien)))
       (render-scene w)
       ;; Start processing buffered OpenGL routines.
       (gl:flush)
       (sdl:update-display)
       (sdl:with-events ()
 	  (:quit-event () t)
-	  (:video-expose-event (sdl:update-display))))))
+	  (:video-expose-event () (sdl:update-display))))))

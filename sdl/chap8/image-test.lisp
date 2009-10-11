@@ -28,7 +28,8 @@
     :initform nil
     :accessor drag-point)))
  
-(defparameter *ship* (make-instance 'rielib:image))
+
+(defparameter *ship*  (make-instance 'rielib:image))
 (defparameter *turret* (make-instance 'rielib:image))
 
 
@@ -99,6 +100,7 @@
 	(setf (rielib:location *ship*) '(100.0 100.0))
 	(rielib:load-texture *turret* turret)
 	(setf (rielib:location *turret*) '(0.0 43.0))
+
 	(rielib:add-subimage *ship* *turret*))
       
       ;; Start processing buffered OpenGL routines.
@@ -109,7 +111,6 @@
 	  (:idle ()
 		 (rielib:rotate *turret* 6)
 		 (rielib:rotate *ship* -3)
-		 (setf (rielib:scale *turret*) (funcall bounce-fn))
 		 (render-scene w)
 		 (gl:flush)
 		 (sdl:update-display))

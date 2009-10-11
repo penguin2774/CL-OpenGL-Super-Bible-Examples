@@ -13,7 +13,8 @@
 	   sub-images
 	   load-texture
 	   render
-	   add-subimage))
+	   add-subimage
+	   x1 y1 x2 y2 x y))
 
 
 (in-package :rielib)
